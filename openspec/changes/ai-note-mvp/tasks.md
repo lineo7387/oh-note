@@ -1,27 +1,27 @@
 ## 1. Project Setup
 
-- [ ] 1.1 Install dependencies: Prisma, @prisma/client, next-auth, blocknote, deepseek-sdk, bcryptjs, zustand
-- [ ] 1.2 Initialize Prisma with PostgreSQL provider and create `.env` with `DATABASE_URL`
-- [ ] 1.3 Add `.env` to `.gitignore`
-- [ ] 1.4 Run initial Prisma migration to set up database
+- [x] 1.1 Install dependencies: Prisma, @prisma/client, next-auth, blocknote, deepseek-sdk, bcryptjs, zustand
+- [x] 1.2 Initialize Prisma with PostgreSQL provider and create `.env` with `DATABASE_URL`
+- [x] 1.3 Add `.env` to `.gitignore`
+- [x] 1.4 Run initial Prisma migration to set up database
 
 ## 2. Database Schema
 
-- [ ] 2.1 Define Prisma schema: `User` model (id, email, passwordHash, createdAt)
-- [ ] 2.2 Define Prisma schema: `Folder` model (id, name, parentId, userId, createdAt) with self-relation
-- [ ] 2.3 Define Prisma schema: `Note` model (id, title, content Json, folderId, userId, createdAt, updatedAt)
-- [ ] 2.4 Add foreign keys and indexes (userId on Folder/Note, parentId on Folder)
-- [ ] 2.5 Run Prisma migrate dev to apply schema
-- [ ] 2.6 Generate Prisma client
+- [x] 2.1 Define Prisma schema: `User` model (id, email, passwordHash, createdAt)
+- [x] 2.2 Define Prisma schema: `Folder` model (id, name, parentId, userId, createdAt) with self-relation
+- [x] 2.3 Define Prisma schema: `Note` model (id, title, content Json, folderId, userId, createdAt, updatedAt)
+- [x] 2.4 Add foreign keys and indexes (userId on Folder/Note, parentId on Folder)
+- [x] 2.5 Run Prisma migrate dev to apply schema
+- [x] 2.6 Generate Prisma client
 
 ## 3. Authentication
 
-- [ ] 3.1 Configure NextAuth with Credentials provider (email + password)
-- [ ] 3.2 Implement register API route (`/api/auth/register`) with bcrypt password hashing
-- [ ] 3.3 Implement login/logout session handling
-- [ ] 3.4 Add auth middleware to protect main application routes
-- [ ] 3.5 Create login page UI (`/login`)
-- [ ] 3.6 Create register page UI (`/register`)
+- [x] 3.1 Configure NextAuth with Credentials provider (email + password)
+- [x] 3.2 Implement register API route (`/api/auth/register`) with bcrypt password hashing
+- [x] 3.3 Implement login/logout session handling
+- [x] 3.4 Add auth middleware to protect main application routes
+- [x] 3.5 Create login page UI (`/login`)
+- [x] 3.6 Create register page UI (`/register`)
 
 ## 4. API Routes - Folder Management
 

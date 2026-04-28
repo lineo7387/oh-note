@@ -45,3 +45,5 @@ next-env.d.ts
 /.claude/
 /.codex/
 /skills-lock.json
+
+/app/generated/prisma
