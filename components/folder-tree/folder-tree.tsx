@@ -1,16 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Folder, ChevronRight, ChevronDown, FolderOpen, Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { useAppStore } from "@/lib/store";
+import { Folder, ChevronRight, ChevronDown, FolderOpen, Plus, MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
+import { useAppStore, type Folder as FolderItem } from "@/lib/store";
+import { useToast } from "@/components/ui/toast";
 
-interface FolderItem {
-  id: string;
-  name: string;
-  parentId: string | null;
-  userId: string;
-  createdAt: string;
-  _count?: { notes: number; children: number };
+interface FolderTreeProps {
+  initialFolders: FolderItem[];
 }
 
 interface FolderNodeProps {
@@ -21,11 +17,13 @@ interface FolderNodeProps {
 
 function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
   const { selectedFolderId, setSelectedFolderId } = useAppStore();
+  const { error, success } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(folder.name);
   const [menuOpen, setMenuOpen] = useState(false);
   const [creatingChild, setCreatingChild] = useState(false);
+  const [isSavingChild, setIsSavingChild] = useState(false);
   const [childName, setChildName] = useState("");
 
   const children = allFolders.filter((f) => f.parentId === folder.id);
@@ -69,19 +67,20 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
         }
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to delete folder");
+        error(data.error || "Failed to delete folder");
       }
     } catch {
-      alert("Failed to delete folder");
+      error("Failed to delete folder");
     }
     setMenuOpen(false);
   };
 
   const handleCreateChild = async () => {
-    if (!childName.trim()) {
-      setCreatingChild(false);
+    if (!childName.trim() || isSavingChild) {
+      if (!childName.trim()) setCreatingChild(false);
       return;
     }
+    setIsSavingChild(true);
     try {
       const res = await fetch("/api/folders", {
         method: "POST",
@@ -92,8 +91,10 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
         const created = await res.json();
         useAppStore.getState().addFolder(created);
         setExpanded(true);
+        success(`Folder "${created.name}" created`);
       }
     } finally {
+      setIsSavingChild(false);
       setCreatingChild(false);
       setChildName("");
     }
@@ -157,14 +158,19 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
 
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
-            className="h-5 w-5 flex items-center justify-center text-pencil/40 hover:text-pen-blue"
+            className="h-5 w-5 flex items-center justify-center text-pencil/40 hover:text-pen-blue disabled:opacity-30"
             onClick={(e) => {
               e.stopPropagation();
-              setCreatingChild(true);
+              if (!isSavingChild) setCreatingChild(true);
             }}
+            disabled={isSavingChild}
             title="New subfolder"
           >
-            <Plus size={12} strokeWidth={2.5} />
+            {isSavingChild ? (
+              <Loader2 size={12} strokeWidth={2.5} className="animate-spin" />
+            ) : (
+              <Plus size={12} strokeWidth={2.5} />
+            )}
           </button>
           <div className="relative">
             <button
@@ -208,21 +214,28 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
 
       {creatingChild && (
         <div className="flex items-center gap-1 py-1 pr-2" style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}>
-          <Folder size={16} className="shrink-0 text-pencil/40" strokeWidth={2.5} />
+          {isSavingChild ? (
+            <span className="shrink-0 h-4 w-4 animate-spin rounded-full border-2 border-pencil/30 border-t-pen-blue" />
+          ) : (
+            <Folder size={16} className="shrink-0 text-pencil/40" strokeWidth={2.5} />
+          )}
           <input
             autoFocus
+            disabled={isSavingChild}
             value={childName}
             onChange={(e) => setChildName(e.target.value)}
             onBlur={handleCreateChild}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleCreateChild();
               if (e.key === "Escape") {
-                setCreatingChild(false);
-                setChildName("");
+                if (!isSavingChild) {
+                  setCreatingChild(false);
+                  setChildName("");
+                }
               }
             }}
-            placeholder="Folder name..."
-            className="min-w-0 flex-1 border-2 border-pen-blue bg-white px-1.5 py-0.5 text-sm text-pencil outline-none wobbly-sm"
+            placeholder={isSavingChild ? "Creating..." : "Folder name..."}
+            className="min-w-0 flex-1 border-2 border-pen-blue bg-white px-1.5 py-0.5 text-sm text-pencil outline-none wobbly-sm disabled:opacity-50"
             style={{ fontFamily: "var(--font-body)" }}
           />
         </div>
@@ -235,34 +248,25 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
   );
 }
 
-export default function FolderTree() {
-  const { folders, setFolders, setSelectedFolderId, setLoadingFolders, loadingFolders } = useAppStore();
+export default function FolderTree({ initialFolders }: FolderTreeProps) {
+  const { folders, setFolders, setSelectedFolderId } = useAppStore();
+  const { success } = useToast();
   const [creating, setCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
   useEffect(() => {
-    async function load() {
-      setLoadingFolders(true);
-      try {
-        const res = await fetch("/api/folders");
-        if (res.ok) {
-          const data = await res.json();
-          setFolders(data);
-        }
-      } finally {
-        setLoadingFolders(false);
-      }
-    }
-    load();
-  }, [setFolders, setLoadingFolders]);
+    setFolders(initialFolders);
+  }, [initialFolders, setFolders]);
 
   const rootFolders = folders.filter((f) => !f.parentId);
 
   const handleCreate = async () => {
-    if (!newFolderName.trim()) {
-      setCreating(false);
+    if (!newFolderName.trim() || isSaving) {
+      if (!newFolderName.trim()) setCreating(false);
       return;
     }
+    setIsSaving(true);
     try {
       const res = await fetch("/api/folders", {
         method: "POST",
@@ -273,8 +277,10 @@ export default function FolderTree() {
         const created = await res.json();
         useAppStore.getState().addFolder(created);
         setSelectedFolderId(created.id);
+        success(`Folder "${created.name}" created`);
       }
     } finally {
+      setIsSaving(false);
       setCreating(false);
       setNewFolderName("");
     }
@@ -287,43 +293,54 @@ export default function FolderTree() {
           Folders
         </h2>
         <button
-          onClick={() => setCreating(true)}
-          className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm"
+          onClick={() => {
+            if (!isSaving) setCreating(true);
+          }}
+          disabled={isSaving}
+          className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm disabled:opacity-50"
         >
-          <Plus size={16} strokeWidth={2.5} />
+          {isSaving ? (
+            <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
+          ) : (
+            <Plus size={16} strokeWidth={2.5} />
+          )}
         </button>
       </div>
 
       {creating && (
         <div className="mx-3 mb-2 flex items-center gap-1.5">
-          <Folder size={16} className="shrink-0 text-pencil/40" strokeWidth={2.5} />
+          {isSaving ? (
+            <span className="shrink-0 h-4 w-4 animate-spin rounded-full border-2 border-pencil/30 border-t-pen-blue" />
+          ) : (
+            <Folder size={16} className="shrink-0 text-pencil/40" strokeWidth={2.5} />
+          )}
           <input
             autoFocus
+            disabled={isSaving}
             value={newFolderName}
             onChange={(e) => setNewFolderName(e.target.value)}
             onBlur={handleCreate}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleCreate();
               if (e.key === "Escape") {
-                setCreating(false);
-                setNewFolderName("");
+                if (!isSaving) {
+                  setCreating(false);
+                  setNewFolderName("");
+                }
               }
             }}
-            placeholder="New folder..."
-            className="min-w-0 flex-1 border-2 border-pen-blue bg-white px-2 py-1 text-sm text-pencil outline-none wobbly-sm"
+            placeholder={isSaving ? "Creating..." : "New folder..."}
+            className="min-w-0 flex-1 border-2 border-pen-blue bg-white px-2 py-1 text-sm text-pencil outline-none wobbly-sm disabled:opacity-50"
             style={{ fontFamily: "var(--font-body)" }}
           />
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto px-1 pb-4">
-        {loadingFolders && folders.length === 0 && (
-          <div className="px-3 py-4 text-sm text-pencil/50">Loading...</div>
-        )}
         {rootFolders.map((folder) => (
           <FolderNode key={folder.id} folder={folder} depth={0} allFolders={folders} />
         ))}
-        {!loadingFolders && rootFolders.length === 0 && (
+        {rootFolders.length === 0 && (
           <div className="px-3 py-6 text-center text-sm text-pencil/50">
             No folders yet.
             <br />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import FolderTree from "@/components/folder-tree/folder-tree";
 import NoteList from "@/components/note-list/note-list";
 import AiSidebar from "@/components/ai-sidebar/ai-sidebar";
@@ -16,16 +17,30 @@ export default async function MainLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect("/login");
   }
+
+  const folders = await prisma.folder.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  // Serialize Date objects to ISO strings for Client Component props
+  const serializedFolders = folders.map((f) => ({
+    id: f.id,
+    name: f.name,
+    parentId: f.parentId,
+    userId: f.userId,
+    createdAt: f.createdAt.toISOString(),
+  }));
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-paper">
       {/* Left column: Folder Tree + Note List */}
       <aside className="flex h-full w-[280px] shrink-0 flex-col border-r-2 border-pencil bg-paper">
         <div className="flex-1 overflow-hidden border-b-2 border-dashed border-pencil/20">
-          <FolderTree />
+          <FolderTree initialFolders={serializedFolders} />
         </div>
         <div className="h-[40%] overflow-hidden">
           <NoteList />

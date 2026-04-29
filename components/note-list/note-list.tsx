@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Loader2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 
 export default function NoteList() {
+  const router = useRouter();
+  const { success } = useToast();
   const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes } = useAppStore();
   const [creating, setCreating] = useState(false);
 
@@ -30,7 +33,7 @@ export default function NoteList() {
   }, [selectedFolderId, setNotes, setLoadingNotes]);
 
   const handleCreate = async () => {
-    if (!selectedFolderId) return;
+    if (!selectedFolderId || creating) return;
     setCreating(true);
     try {
       const res = await fetch("/api/notes", {
@@ -42,6 +45,7 @@ export default function NoteList() {
         const note = await res.json();
         useAppStore.getState().addNote(note);
         setSelectedNoteId(note.id);
+        success("Note created");
       }
     } finally {
       setCreating(false);
@@ -66,9 +70,13 @@ export default function NoteList() {
         <button
           onClick={handleCreate}
           disabled={creating}
-          className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm"
+          className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm disabled:opacity-50"
         >
-          <Plus size={16} strokeWidth={2.5} />
+          {creating ? (
+            <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
+          ) : (
+            <Plus size={16} strokeWidth={2.5} />
+          )}
         </button>
       </div>
 
@@ -79,11 +87,13 @@ export default function NoteList() {
         {notes.map((note) => {
           const isSelected = selectedNoteId === note.id;
           return (
-            <Link
+            <div
               key={note.id}
-              href={`/note/${note.id}`}
-              onClick={() => setSelectedNoteId(note.id)}
-              className={`flex items-center gap-2 px-3 py-2 transition-colors ${
+              onClick={() => {
+                setSelectedNoteId(note.id);
+                router.push(`/note/${note.id}`);
+              }}
+              className={`flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors ${
                 isSelected ? "bg-pen-blue/10" : "hover:bg-pencil/5"
               }`}
             >
@@ -91,7 +101,7 @@ export default function NoteList() {
               <span className={`min-w-0 flex-1 truncate text-sm ${isSelected ? "font-bold text-pen-blue" : "text-pencil"}`}>
                 {note.title}
               </span>
-            </Link>
+            </div>
           );
         })}
         {!loadingNotes && notes.length === 0 && (

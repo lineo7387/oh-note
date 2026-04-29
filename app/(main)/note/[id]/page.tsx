@@ -196,6 +196,7 @@ export default function NotePage() {
         <div className="mx-auto max-w-3xl">
           <div className="border-2 border-pencil bg-white p-4 shadow-sketch-subtle wobbly-sm">
             <Editor
+              key={note.id}
               initialContent={note.content}
               onChange={handleContentChange}
               editable={true}
