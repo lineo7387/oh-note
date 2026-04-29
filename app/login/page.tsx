@@ -26,7 +26,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error) {
-      setError("Invalid email or password");
+      setError("Oops! Wrong email or password~");
     } else {
       router.push("/");
       router.refresh();
@@ -34,21 +34,32 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
-        <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div
+        className="relative w-full max-w-md border-[3px] border-pencil bg-white p-8 shadow-sketch wobbly"
+      >
+        {/* Tape decoration */}
+        <div
+          className="absolute -top-3 left-1/2 h-6 w-20 -translate-x-1/2 -rotate-2 border-2 border-pencil bg-muted/60"
+          style={{ borderRadius: "4px" }}
+        />
+
+        <h1
+          className="mb-6 text-center text-4xl font-bold text-pencil"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
           Sign in to oh-note
         </h1>
 
         {error && (
-          <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600">
+          <div className="mb-4 border-2 border-accent bg-accent/10 p-3 text-accent wobbly-sm">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-lg font-bold text-pencil">
               Email
             </label>
             <input
@@ -56,12 +67,13 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="your@email.com"
+              className="input-sketch w-full border-2 border-pencil bg-white px-4 py-3 text-lg text-pencil placeholder:text-pencil/40 wobbly-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-lg font-bold text-pencil">
               Password
             </label>
             <input
@@ -69,22 +81,24 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="your secret..."
+              className="input-sketch w-full border-2 border-pencil bg-white px-4 py-3 text-lg text-pencil placeholder:text-pencil/40 wobbly-sm"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn-sketch w-full border-[3px] border-pencil bg-white px-4 py-3 text-xl font-bold text-pencil shadow-sketch wobbly-md"
+            style={{ fontFamily: "var(--font-heading)" }}
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-5 text-center text-lg text-pencil/70">
           Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-blue-600 hover:underline">
+          <Link href="/register" className="font-bold text-pen-blue underline decoration-2 underline-offset-4 hover:text-accent">
             Sign up
           </Link>
         </p>

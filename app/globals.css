@@ -1,26 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&display=swap');
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: #fdfbf7;
+  --color-pencil: #2d2d2d;
+  --color-muted: #e5e0d8;
+  --color-accent: #ff4d4d;
+  --color-pen-blue: #2d5da1;
+  --color-postit: #fff9c4;
+  --color-white: #ffffff;
+  --color-white-trans: rgba(255, 255, 255, 0.85);
+
+  --font-heading: 'Kalam', cursive;
+  --font-body: 'Patrick Hand', cursive;
+  --font-sans: 'Patrick Hand', cursive;
+
+  --radius-wobbly: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --radius-wobbly-md: 20px 200px 20px 200px / 200px 20px 200px 20px;
+  --radius-wobbly-sm: 100px 10px 100px 10px / 10px 100px 10px 100px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #fdfbf7;
+  --foreground: #2d2d2d;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: radial-gradient(#e5e0d8 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  font-size: 18px;
+}
+
+/* Heading font */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* Wobbly border utility helpers */
+.wobbly {
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+
+.wobbly-md {
+  border-radius: 20px 200px 20px 200px / 200px 20px 200px 20px;
+}
+
+.wobbly-sm {
+  border-radius: 100px 10px 100px 10px / 10px 100px 10px 100px;
+}
+
+/* Hard offset shadow utilities */
+.shadow-sketch {
+  box-shadow: 4px 4px 0px 0px #2d2d2d;
+}
+
+.shadow-sketch-lg {
+  box-shadow: 8px 8px 0px 0px #2d2d2d;
+}
+
+.shadow-sketch-subtle {
+  box-shadow: 3px 3px 0px 0px rgba(45, 45, 45, 0.1);
+}
+
+/* Hover press effect for buttons */
+.btn-sketch {
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
+}
+
+.btn-sketch:hover {
+  background-color: var(--color-accent);
+  color: white;
+  box-shadow: 2px 2px 0px 0px #2d2d2d;
+  transform: translate(2px, 2px);
+}
+
+.btn-sketch:active {
+  box-shadow: 0px 0px 0px 0px #2d2d2d;
+  transform: translate(4px, 4px);
+}
+
+/* Secondary sketch button */
+.btn-sketch-secondary:hover {
+  background-color: var(--color-pen-blue);
+  color: white;
+  box-shadow: 2px 2px 0px 0px #2d2d2d;
+  transform: translate(2px, 2px);
+}
+
+.btn-sketch-secondary:active {
+  box-shadow: 0px 0px 0px 0px #2d2d2d;
+  transform: translate(4px, 4px);
+}
+
+/* Input sketch focus */
+.input-sketch:focus {
+  border-color: var(--color-pen-blue);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(45, 93, 161, 0.2);
+}
+
+/* Paper tape decoration */
+.tape::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  width: 80px;
+  height: 24px;
+  background-color: rgba(229, 224, 216, 0.6);
+  border: 2px solid #2d2d2d;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+/* Card jiggle on hover */
+.card-jiggle {
+  transition: transform 0.1s ease;
+}
+
+.card-jiggle:hover {
+  transform: rotate(0.5deg);
 }
