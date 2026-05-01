@@ -50,7 +50,13 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
       if (res.ok) {
         const updated = await res.json();
         useAppStore.getState().updateFolder(updated);
+        success(`Renamed to "${updated.name}"`);
+      } else {
+        const data = await res.json();
+        error(data.error || "Failed to rename folder");
       }
+    } catch {
+      error("Failed to rename folder");
     } finally {
       setRenaming(false);
     }
@@ -65,6 +71,7 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
         if (selectedFolderId === folder.id) {
           setSelectedFolderId(null);
         }
+        success(`Folder "${folder.name}" deleted`);
       } else {
         const data = await res.json();
         error(data.error || "Failed to delete folder");

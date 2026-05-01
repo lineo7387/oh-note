@@ -2,13 +2,26 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const connectionString = process.env.DATABASE_URL;
+const rawConnectionString = process.env.DATABASE_URL;
+
+// Remove sslmode from connection string to avoid pg warning.
+// SSL is handled explicitly via the `ssl` option below.
+let connectionString = rawConnectionString;
+if (connectionString) {
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("sslmode");
+    connectionString = url.toString();
+  } catch {
+    // not a valid URL, pass as-is
+  }
+}
+
+const isNeon = rawConnectionString?.includes("neon.tech") ?? false;
 
 const pool = new Pool({
   connectionString,
-  ssl: connectionString?.includes("neon.tech")
-    ? { rejectUnauthorized: false }
-    : undefined,
+  ssl: isNeon ? { rejectUnauthorized: false } : undefined,
 });
 
 const adapter = new PrismaPg(pool);
