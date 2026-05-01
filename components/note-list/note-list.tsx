@@ -110,10 +110,10 @@ export default function NoteList() {
           );
         })}
         {!loadingNotes && notes.length === 0 && (
-          <div className="px-3 py-6 text-center text-sm text-pencil/50">
-            No notes in this folder.
-            <br />
-            Click + to create one!
+          <div className="flex flex-col items-center justify-center px-3 py-8 text-center text-pencil/40">
+            <FileText size={40} strokeWidth={1.5} className="mb-2" />
+            <p className="text-sm font-bold">No notes yet</p>
+            <p className="mt-1 text-xs">Click + to create one</p>
           </div>
         )}
       </div>
