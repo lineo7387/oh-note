@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
-import { FileText, Plus, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FileText, Plus, Loader2, Upload } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { SkeletonNote } from "@/components/ui/skeleton";
 import { useAsyncAction } from "@/lib/use-async-action";
+import ImportModal from "@/components/import-modal";
 
 export default function NoteList() {
   const router = useRouter();
   const { success, error: toastError } = useToast();
   const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes, setSidebarOpen } = useAppStore();
+  const [showImport, setShowImport] = useState(false);
 
   const { loading: creating, run: runCreate } = useAsyncAction();
 
@@ -74,17 +76,27 @@ export default function NoteList() {
         <h2 className="text-xl font-bold text-pencil" style={{ fontFamily: "var(--font-heading)" }}>
           Notes
         </h2>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm disabled:opacity-50"
-        >
-          {creating ? (
-            <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
-          ) : (
-            <Plus size={16} strokeWidth={2.5} />
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowImport(true)}
+            disabled={!selectedFolderId || creating}
+            className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm disabled:opacity-50"
+            title="Import Markdown"
+          >
+            <Upload size={16} strokeWidth={2.5} />
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={creating}
+            className="btn-sketch flex h-8 w-8 items-center justify-center border-2 border-pencil bg-white text-pencil shadow-sketch wobbly-sm disabled:opacity-50"
+          >
+            {creating ? (
+              <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
+            ) : (
+              <Plus size={16} strokeWidth={2.5} />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 pb-4">
@@ -118,6 +130,12 @@ export default function NoteList() {
           </div>
         )}
       </div>
+      {showImport && (
+        <ImportModal
+          folderId={selectedFolderId}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }
