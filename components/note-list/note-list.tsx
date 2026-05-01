@@ -11,7 +11,7 @@ import { useAsyncAction } from "@/lib/use-async-action";
 export default function NoteList() {
   const router = useRouter();
   const { success, error: toastError } = useToast();
-  const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes } = useAppStore();
+  const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes, setSidebarOpen } = useAppStore();
 
   const { loading: creating, run: runCreate } = useAsyncAction();
 
@@ -96,6 +96,7 @@ export default function NoteList() {
               key={note.id}
               onClick={() => {
                 setSelectedNoteId(note.id);
+                setSidebarOpen(false);
                 router.push(`/note/${note.id}`);
               }}
               className={`flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors ${

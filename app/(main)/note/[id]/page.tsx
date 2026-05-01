@@ -164,7 +164,7 @@ export default function NotePage() {
   return (
     <div className="flex h-full w-full flex-col bg-paper">
       {/* Editor header */}
-      <div className="flex items-center justify-between border-b-2 border-dashed border-pencil/20 px-6 py-4">
+      <div className="flex items-center justify-between border-b-2 border-dashed border-pencil/20 px-3 py-3 md:px-6 md:py-4">
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <input
@@ -202,7 +202,7 @@ export default function NotePage() {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-auto px-6 py-6">
+      <div className="flex-1 overflow-auto px-3 py-4 md:px-6 md:py-6">
         <div className="mx-auto max-w-3xl">
           <div className="border-2 border-pencil bg-white p-4 shadow-sketch-subtle wobbly-sm">
             <Editor

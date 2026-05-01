@@ -29,6 +29,7 @@ interface AppState {
   aiOpen: boolean;
   loadingFolders: boolean;
   loadingNotes: boolean;
+  sidebarOpen: boolean;
   setFolders: (folders: Folder[]) => void;
   setNotes: (notes: Note[]) => void;
   setSelectedFolderId: (id: string | null) => void;
@@ -36,6 +37,7 @@ interface AppState {
   setAiOpen: (open: boolean) => void;
   setLoadingFolders: (loading: boolean) => void;
   setLoadingNotes: (loading: boolean) => void;
+  setSidebarOpen: (open: boolean) => void;
   addFolder: (folder: Folder) => void;
   updateFolder: (folder: Folder) => void;
   removeFolder: (id: string) => void;
@@ -52,6 +54,7 @@ export const useAppStore = create<AppState>((set) => ({
   aiOpen: false,
   loadingFolders: false,
   loadingNotes: false,
+  sidebarOpen: false,
   setFolders: (folders) => set({ folders }),
   setNotes: (notes) => set({ notes }),
   setSelectedFolderId: (id) => set({ selectedFolderId: id, notes: [], selectedNoteId: null }),
@@ -59,6 +62,7 @@ export const useAppStore = create<AppState>((set) => ({
   setAiOpen: (open) => set({ aiOpen: open }),
   setLoadingFolders: (loading) => set({ loadingFolders: loading }),
   setLoadingNotes: (loading) => set({ loadingNotes: loading }),
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
   addFolder: (folder) => set((state) => ({ folders: [...state.folders, folder] })),
   updateFolder: (folder) =>
     set((state) => ({

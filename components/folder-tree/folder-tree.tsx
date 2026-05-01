@@ -34,10 +34,13 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
   const hasChildren = children.length > 0;
   const isSelected = selectedFolderId === folder.id;
 
+  const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
+
   const handleToggle = useCallback(() => {
     if (hasChildren) setExpanded((e) => !e);
     setSelectedFolderId(folder.id);
-  }, [hasChildren, folder.id, setSelectedFolderId]);
+    setSidebarOpen(false);
+  }, [hasChildren, folder.id, setSelectedFolderId, setSidebarOpen]);
 
   const handleRename = async () => {
     if (!newName.trim() || newName.trim() === folder.name) {
