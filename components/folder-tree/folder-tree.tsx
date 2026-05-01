@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Folder, ChevronRight, ChevronDown, FolderOpen, Plus, MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useAppStore, type Folder as FolderItem } from "@/lib/store";
 import { useToast } from "@/components/ui/toast";
+import { useAsyncAction } from "@/lib/use-async-action";
 
 interface FolderTreeProps {
   initialFolders: FolderItem[];
@@ -23,8 +24,11 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
   const [newName, setNewName] = useState(folder.name);
   const [menuOpen, setMenuOpen] = useState(false);
   const [creatingChild, setCreatingChild] = useState(false);
-  const [isSavingChild, setIsSavingChild] = useState(false);
   const [childName, setChildName] = useState("");
+
+  const { loading: isRenaming, run: runRename } = useAsyncAction();
+  const { loading: isDeleting, run: runDelete } = useAsyncAction();
+  const { loading: isSavingChild, run: runCreateChild } = useAsyncAction();
 
   const children = allFolders.filter((f) => f.parentId === folder.id);
   const hasChildren = children.length > 0;
@@ -41,7 +45,8 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
       setNewName(folder.name);
       return;
     }
-    try {
+
+    await runRename(async () => {
       const res = await fetch(`/api/folders/${folder.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -55,16 +60,14 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
         const data = await res.json();
         error(data.error || "Failed to rename folder");
       }
-    } catch {
-      error("Failed to rename folder");
-    } finally {
-      setRenaming(false);
-    }
+    });
+    setRenaming(false);
   };
 
   const handleDelete = async () => {
     if (!confirm(`Delete folder "${folder.name}"?`)) return;
-    try {
+
+    await runDelete(async () => {
       const res = await fetch(`/api/folders/${folder.id}`, { method: "DELETE" });
       if (res.ok) {
         useAppStore.getState().removeFolder(folder.id);
@@ -76,19 +79,17 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
         const data = await res.json();
         error(data.error || "Failed to delete folder");
       }
-    } catch {
-      error("Failed to delete folder");
-    }
+    });
     setMenuOpen(false);
   };
 
   const handleCreateChild = async () => {
-    if (!childName.trim() || isSavingChild) {
-      if (!childName.trim()) setCreatingChild(false);
+    if (!childName.trim()) {
+      setCreatingChild(false);
       return;
     }
-    setIsSavingChild(true);
-    try {
+
+    await runCreateChild(async () => {
       const res = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,11 +101,9 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
         setExpanded(true);
         success(`Folder "${created.name}" created`);
       }
-    } finally {
-      setIsSavingChild(false);
-      setCreatingChild(false);
-      setChildName("");
-    }
+    });
+    setCreatingChild(false);
+    setChildName("");
   };
 
   useEffect(() => {
@@ -134,29 +133,40 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
           )}
         </button>
 
-        {isSelected ? (
+        {!renaming && (isSelected ? (
           <FolderOpen size={16} className="shrink-0 text-pen-blue" strokeWidth={2.5} />
         ) : (
           <Folder size={16} className="shrink-0 text-pencil/60" strokeWidth={2.5} />
-        )}
+        ))}
 
         {renaming ? (
-          <input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onBlur={handleRename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleRename();
-              if (e.key === "Escape") {
-                setRenaming(false);
-                setNewName(folder.name);
-              }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="min-w-0 flex-1 border-2 border-pen-blue bg-white px-1.5 py-0.5 text-sm text-pencil outline-none wobbly-sm"
-            style={{ fontFamily: "var(--font-body)" }}
-          />
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            {isRenaming ? (
+              <span className="shrink-0 h-4 w-4 animate-spin rounded-full border-2 border-pencil/30 border-t-pen-blue" />
+            ) : (
+              <Folder size={16} className="shrink-0 text-pencil/40" strokeWidth={2.5} />
+            )}
+            <input
+              autoFocus
+              disabled={isRenaming}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRename();
+                if (e.key === "Escape") {
+                  if (!isRenaming) {
+                    setRenaming(false);
+                    setNewName(folder.name);
+                  }
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={isRenaming ? "Renaming..." : undefined}
+              className="min-w-0 flex-1 border-2 border-pen-blue bg-white px-2 py-1 text-sm text-pencil outline-none wobbly-sm disabled:opacity-50"
+              style={{ fontFamily: "var(--font-body)" }}
+            />
+          </div>
         ) : (
           <span className={`min-w-0 flex-1 truncate text-sm ${isSelected ? "font-bold text-pen-blue" : "text-pencil"}`}>
             {folder.name}
@@ -209,6 +219,7 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
                       e.stopPropagation();
                       handleDelete();
                     }}
+                    disabled={isDeleting}
                   >
                     <Trash2 size={12} strokeWidth={2.5} /> Delete
                   </button>
@@ -257,10 +268,11 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
 
 export default function FolderTree({ initialFolders }: FolderTreeProps) {
   const { folders, setFolders, setSelectedFolderId } = useAppStore();
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
   const [creating, setCreating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+
+  const { loading: isSaving, run: runCreate } = useAsyncAction();
 
   useEffect(() => {
     setFolders(initialFolders);
@@ -269,12 +281,12 @@ export default function FolderTree({ initialFolders }: FolderTreeProps) {
   const rootFolders = folders.filter((f) => !f.parentId);
 
   const handleCreate = async () => {
-    if (!newFolderName.trim() || isSaving) {
-      if (!newFolderName.trim()) setCreating(false);
+    if (!newFolderName.trim()) {
+      setCreating(false);
       return;
     }
-    setIsSaving(true);
-    try {
+
+    await runCreate(async () => {
       const res = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -285,12 +297,12 @@ export default function FolderTree({ initialFolders }: FolderTreeProps) {
         useAppStore.getState().addFolder(created);
         setSelectedFolderId(created.id);
         success(`Folder "${created.name}" created`);
+      } else {
+        toastError("Failed to create folder");
       }
-    } finally {
-      setIsSaving(false);
-      setCreating(false);
-      setNewFolderName("");
-    }
+    });
+    setCreating(false);
+    setNewFolderName("");
   };
 
   return (

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { MessageCircle, X, Send, Bot, User, Loader2 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 import { extractTextFromBlocks } from "@/components/editor/editor";
 
 interface ChatMessage {
@@ -18,6 +19,7 @@ export default function AiSidebar() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [noteContext, setNoteContext] = useState("");
+  const { error: toastError } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -49,8 +51,11 @@ export default function AiSidebar() {
           const text = extractTextFromBlocks(note.content);
           const title = note.title || "Untitled";
           setNoteContext(text ? `Title: ${title}\n\n${text}` : `Title: ${title}\n\n(Empty note)`);
+        } else {
+          toastError("Failed to load note context for AI");
         }
       } catch {
+        toastError("Failed to load note context for AI");
         setNoteContext("");
       }
     }

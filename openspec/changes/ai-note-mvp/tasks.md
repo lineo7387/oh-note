@@ -74,7 +74,7 @@
 
 ## 9. Polish & Integration
 
-- [ ] 9.1 Add error handling and toast notifications for API failures
+- [x] 9.1 Add error handling and toast notifications for API failures
 - [ ] 9.2 Add loading skeletons for folder tree and note list
 - [ ] 9.3 Implement empty states (no folders, no notes, empty editor)
 - [x] 9.4 Add keyboard shortcuts (Ctrl+S for save, Escape to collapse AI sidebar)

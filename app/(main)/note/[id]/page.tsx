@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { FileText, Save } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useToast } from "@/components/ui/toast";
 import type { BlockNoteDocument } from "@/lib/blocknote-types";
 
 const Editor = dynamic(() => import("@/components/editor/editor"), {
@@ -28,6 +29,7 @@ interface NoteData {
 export default function NotePage() {
   const params = useParams();
   const noteId = params.id as string;
+  const { error: toastError } = useToast();
   const [note, setNote] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,13 +50,17 @@ export default function NotePage() {
           setNote(data);
           setTitle(data.title);
           contentRef.current = data.content;
+        } else {
+          toastError("Failed to load note");
         }
+      } catch {
+        toastError("Failed to load note");
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [noteId]);
+  }, [noteId, toastError]);
 
   const saveNote = useCallback(
     async (updates: { title?: string; content?: BlockNoteDocument }) => {
@@ -70,12 +76,16 @@ export default function NotePage() {
           const updated = await res.json();
           setNote(updated);
           setHasChanges(false);
+        } else {
+          toastError("Failed to save note");
         }
+      } catch {
+        toastError("Failed to save note");
       } finally {
         setSaving(false);
       }
     },
-    [note, noteId]
+    [note, noteId, toastError]
   );
 
   const handleTitleChange = (newTitle: string) => {

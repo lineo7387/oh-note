@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { FileText, Plus, Loader2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { useAsyncAction } from "@/lib/use-async-action";
 
 export default function NoteList() {
   const router = useRouter();
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
   const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes } = useAppStore();
-  const [creating, setCreating] = useState(false);
+
+  const { loading: creating, run: runCreate } = useAsyncAction();
 
   useEffect(() => {
     if (!selectedFolderId) {
@@ -24,7 +26,11 @@ export default function NoteList() {
         if (res.ok) {
           const data = await res.json();
           setNotes(data);
+        } else {
+          toastError("Failed to load notes");
         }
+      } catch {
+        toastError("Failed to load notes");
       } finally {
         setLoadingNotes(false);
       }
@@ -33,9 +39,9 @@ export default function NoteList() {
   }, [selectedFolderId, setNotes, setLoadingNotes]);
 
   const handleCreate = async () => {
-    if (!selectedFolderId || creating) return;
-    setCreating(true);
-    try {
+    if (!selectedFolderId) return;
+
+    await runCreate(async () => {
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -46,10 +52,10 @@ export default function NoteList() {
         useAppStore.getState().addNote(note);
         setSelectedNoteId(note.id);
         success("Note created");
+      } else {
+        toastError("Failed to create note");
       }
-    } finally {
-      setCreating(false);
-    }
+    });
   };
 
   if (!selectedFolderId) {
