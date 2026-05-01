@@ -5,6 +5,7 @@ import { FileText, Plus, Loader2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { SkeletonNote } from "@/components/ui/skeleton";
 import { useAsyncAction } from "@/lib/use-async-action";
 
 export default function NoteList() {
@@ -87,9 +88,7 @@ export default function NoteList() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 pb-4">
-        {loadingNotes && notes.length === 0 && (
-          <div className="px-3 py-4 text-sm text-pencil/50">Loading...</div>
-        )}
+        {loadingNotes && notes.length === 0 && <SkeletonNote count={4} />}
         {notes.map((note) => {
           const isSelected = selectedNoteId === note.id;
           return (
