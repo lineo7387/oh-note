@@ -210,7 +210,7 @@ export default function AiSidebar() {
 
       {/* Sidebar panel */}
       {open && (
-        <div className="flex h-full w-[320px] shrink-0 flex-col border-l-2 border-pencil bg-paper shadow-[-4px_0_0_0_#2d2d2d]"
+        <div className="fixed right-0 top-0 z-50 flex h-full w-[320px] flex-col border-l-2 border-pencil bg-paper shadow-[-8px_0_24px_0_rgba(0,0,0,0.12)] lg:static lg:z-auto lg:shadow-[-4px_0_0_0_#2d2d2d]"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b-2 border-dashed border-pencil/20 px-4 py-3"

@@ -39,7 +39,7 @@ export default async function MainLayout({
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-paper">
+    <div className="flex h-screen w-screen min-w-[768px] overflow-hidden bg-paper">
       {/* Left column: Folder Tree + Note List */}
       <aside className="flex h-full w-[280px] shrink-0 flex-col border-r-2 border-pencil bg-paper">
         <div className="flex-1 overflow-hidden border-b-2 border-dashed border-pencil/20">
@@ -53,7 +53,7 @@ export default async function MainLayout({
       </aside>
 
       {/* Center: Editor */}
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex min-w-0 flex-1 overflow-hidden">
         {children}
       </main>
 
