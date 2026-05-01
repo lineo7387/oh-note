@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus, Loader2, Upload } from "lucide-react";
+import { FileText, Plus, Loader2, Upload, Trash2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
@@ -12,8 +12,9 @@ import ImportModal from "@/components/import-modal";
 export default function NoteList() {
   const router = useRouter();
   const { success, error: toastError } = useToast();
-  const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes, setSidebarOpen } = useAppStore();
+  const { notes, selectedFolderId, selectedNoteId, setNotes, setSelectedNoteId, loadingNotes, setLoadingNotes, setSidebarOpen, removeNote } = useAppStore();
   const [showImport, setShowImport] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { loading: creating, run: runCreate } = useAsyncAction();
 
@@ -59,6 +60,30 @@ export default function NoteList() {
         toastError("Failed to create note");
       }
     });
+  };
+
+  const handleDelete = async (noteId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this note? This cannot be undone.")) return;
+
+    setDeletingId(noteId);
+    try {
+      const res = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
+      if (res.ok) {
+        removeNote(noteId);
+        success("Note deleted");
+        if (selectedNoteId === noteId) {
+          setSelectedNoteId(null);
+          router.push("/");
+        }
+      } else {
+        toastError("Failed to delete note");
+      }
+    } catch {
+      toastError("Failed to delete note");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (!selectedFolderId) {
@@ -111,7 +136,7 @@ export default function NoteList() {
                 setSidebarOpen(false);
                 router.push(`/note/${note.id}`);
               }}
-              className={`flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors ${
+              className={`group flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors ${
                 isSelected ? "bg-pen-blue/10" : "hover:bg-pencil/5"
               }`}
             >
@@ -119,6 +144,18 @@ export default function NoteList() {
               <span className={`min-w-0 flex-1 truncate text-sm ${isSelected ? "font-bold text-pen-blue" : "text-pencil"}`}>
                 {note.title}
               </span>
+              <button
+                onClick={(e) => handleDelete(note.id, e)}
+                disabled={deletingId === note.id}
+                className="flex h-6 w-6 shrink-0 items-center justify-center text-pencil/30 opacity-0 transition-opacity group-hover:opacity-100 hover:text-accent disabled:opacity-100"
+                title="Delete note"
+              >
+                {deletingId === note.id ? (
+                  <Loader2 size={14} strokeWidth={2.5} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} strokeWidth={2.5} />
+                )}
+              </button>
             </div>
           );
         })}

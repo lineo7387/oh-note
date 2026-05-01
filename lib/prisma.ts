@@ -22,6 +22,9 @@ const isNeon = rawConnectionString?.includes("neon.tech") ?? false;
 const pool = new Pool({
   connectionString,
   ssl: isNeon ? { rejectUnauthorized: false } : undefined,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 10,
 });
 
 const adapter = new PrismaPg(pool);

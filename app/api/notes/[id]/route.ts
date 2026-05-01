@@ -88,20 +88,17 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const note = await prisma.note.findFirst({
+    // Use deleteMany to avoid RETURNING * (which fetches huge content)
+    const result = await prisma.note.deleteMany({
       where: { id, userId: session.user.id },
     });
 
-    if (!note) {
+    if (result.count === 0) {
       return NextResponse.json(
         { error: "Note not found" },
         { status: 404 }
       );
     }
-
-    await prisma.note.delete({
-      where: { id },
-    });
 
     return NextResponse.json({ success: true });
   } catch {

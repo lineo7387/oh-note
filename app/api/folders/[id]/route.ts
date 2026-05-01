@@ -61,24 +61,12 @@ export async function DELETE(
 
     const folder = await prisma.folder.findFirst({
       where: { id, userId: session.user.id },
-      include: {
-        _count: {
-          select: { notes: true, children: true },
-        },
-      },
     });
 
     if (!folder) {
       return NextResponse.json(
         { error: "Folder not found" },
         { status: 404 }
-      );
-    }
-
-    if (folder._count.notes > 0 || folder._count.children > 0) {
-      return NextResponse.json(
-        { error: "Cannot delete folder that contains notes or subfolders" },
-        { status: 400 }
       );
     }
 

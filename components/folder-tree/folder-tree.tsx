@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Folder, ChevronRight, ChevronDown, FolderOpen, Plus, MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useAppStore, type Folder as FolderItem } from "@/lib/store";
 import { useToast } from "@/components/ui/toast";
@@ -16,9 +17,19 @@ interface FolderNodeProps {
   allFolders: FolderItem[];
 }
 
+function getDescendantIds(folderId: string, allFolders: FolderItem[]): string[] {
+  const ids = [folderId];
+  const children = allFolders.filter((f) => f.parentId === folderId);
+  for (const child of children) {
+    ids.push(...getDescendantIds(child.id, allFolders));
+  }
+  return ids;
+}
+
 function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
   const { selectedFolderId, setSelectedFolderId } = useAppStore();
   const { error, success } = useToast();
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(folder.name);
@@ -68,14 +79,43 @@ function FolderNode({ folder, depth, allFolders }: FolderNodeProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete folder "${folder.name}"?`)) return;
+    const allFolderIds = getDescendantIds(folder.id, allFolders);
+    const {
+      notes,
+      selectedFolderId: currentFolderId,
+      selectedNoteId,
+      setSelectedFolderId,
+      setSelectedNoteId,
+      removeFolder,
+      removeNote,
+    } = useAppStore.getState();
+
+    const affectedNotes = notes.filter((n) => allFolderIds.includes(n.folderId));
+    const noteCount = affectedNotes.length;
+    const subfolderCount = allFolderIds.length - 1;
+
+    const confirmMsg =
+      noteCount > 0 || subfolderCount > 0
+        ? `Delete folder "${folder.name}" and all its contents?\n\nThis will delete ${noteCount} note(s) and ${subfolderCount} subfolder(s). This cannot be undone.`
+        : `Delete folder "${folder.name}"? This cannot be undone.`;
+
+    if (!confirm(confirmMsg)) return;
 
     await runDelete(async () => {
       const res = await fetch(`/api/folders/${folder.id}`, { method: "DELETE" });
       if (res.ok) {
-        useAppStore.getState().removeFolder(folder.id);
-        if (selectedFolderId === folder.id) {
+        for (const id of allFolderIds) {
+          removeFolder(id);
+        }
+        for (const note of affectedNotes) {
+          removeNote(note.id);
+        }
+        if (allFolderIds.includes(currentFolderId || "")) {
           setSelectedFolderId(null);
+        }
+        if (affectedNotes.some((n) => n.id === selectedNoteId)) {
+          setSelectedNoteId(null);
+          router.push("/");
         }
         success(`Folder "${folder.name}" deleted`);
       } else {

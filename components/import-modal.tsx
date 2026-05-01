@@ -21,6 +21,15 @@ interface ImportProgress {
   error?: string;
 }
 
+const IMAGE_REGEX = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+
+function rewriteImageUrls(markdown: string): string {
+  return markdown.replace(IMAGE_REGEX, (match, alt, url) => {
+    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    return `![${alt}](${proxyUrl})`;
+  });
+}
+
 export default function ImportModal({ folderId, onClose }: ImportModalProps) {
   const { success, error: toastError } = useToast();
   const { folders, addFolder, addNote } = useAppStore();
@@ -75,13 +84,6 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
     [editor]
   );
 
-  const findFolderByName = useCallback(
-    (name: string, parentId: string | null, folderList: Folder[]): Folder | undefined => {
-      return folderList.find((f) => f.name === name && f.parentId === parentId);
-    },
-    []
-  );
-
   const handleSingleFiles = useCallback(
     async (files: FileList | null) => {
       if (!files || !folderId) return;
@@ -106,7 +108,8 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
 
         try {
           const markdown = await file.text();
-          const blocks = await parseMarkdown(markdown);
+          const processedMarkdown = rewriteImageUrls(markdown);
+          const blocks = await parseMarkdown(processedMarkdown);
           await createNote(title, folderId, blocks);
           setProgress((p) => ({ ...p, done: i + 1 }));
         } catch (err) {
@@ -180,7 +183,8 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
           }
 
           const markdown = await file.text();
-          const blocks = await parseMarkdown(markdown);
+          const processedMarkdown = rewriteImageUrls(markdown);
+          const blocks = await parseMarkdown(processedMarkdown);
           const note = await createNote(title, currentParentId, blocks);
           addNote(note);
           setProgress((p) => ({ ...p, done: i + 1 }));
@@ -240,6 +244,7 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
             <div className="space-y-3">
               <p className="text-sm text-pencil/60">
                 Import Markdown files into the currently selected folder.
+                Network images will be proxied automatically.
               </p>
 
               <button
@@ -297,7 +302,7 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
               </div>
 
               <div className="truncate text-xs text-pencil/40" title={progress.current}>
-                {progress.current || "Preparing…"}
+                {progress.current || "Reading file…"}
               </div>
 
               <button
