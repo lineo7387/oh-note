@@ -29,6 +29,30 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Environment Variables
+
+Create a `.env.local` file with the following variables:
+
+```
+DATABASE_URL="postgresql://..."
+NEXTAUTH_SECRET="..."
+NEXTAUTH_URL="http://localhost:3000"
+DEEPSEEK_API_KEY="sk-..."
+SILICONFLOW_API_KEY="sk-..."
+```
+
+- **Database**: Neon PostgreSQL (requires `pgvector` extension)
+- **AI Chat**: DeepSeek API (`deepseek-v4-pro`)
+- **Knowledge Base Embedding**: SiliconFlow API (`BAAI/bge-m3`, 1024-dim)
+
+## Backfill Embeddings
+
+To generate embeddings for existing notes:
+
+```bash
+pnpm backfill-embeddings
+```
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

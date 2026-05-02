@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { upsertNoteEmbedding } from "@/lib/embedding";
 
 export async function GET(
   _request: Request,
@@ -65,6 +66,16 @@ export async function PATCH(
     const updated = await prisma.note.update({
       where: { id },
       data,
+    });
+
+    // Async: update embedding for knowledge base search (non-blocking)
+    upsertNoteEmbedding(
+      updated.id,
+      session.user.id,
+      updated.title,
+      updated.content
+    ).catch(() => {
+      // Silently ignore embedding failures
     });
 
     return NextResponse.json(updated);

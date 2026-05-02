@@ -6,11 +6,17 @@ import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { extractTextFromBlocks } from "@/components/editor/editor";
 
+interface SourceNote {
+  id: string;
+  title: string;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
+  sources?: SourceNote[];
 }
 
 export default function AiSidebar() {
@@ -122,6 +128,17 @@ export default function AiSidebar() {
         throw new Error("Failed to get response");
       }
 
+      // Parse source notes from response headers
+      let sourceNotes: SourceNote[] = [];
+      const sourceNotesHeader = res.headers.get("X-Source-Notes");
+      if (sourceNotesHeader) {
+        try {
+          sourceNotes = JSON.parse(decodeURIComponent(sourceNotesHeader));
+        } catch {
+          // ignore malformed header
+        }
+      }
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -166,7 +183,11 @@ export default function AiSidebar() {
         const last = prev[prev.length - 1];
         if (last?.role !== "assistant") return prev;
         const updated = [...prev];
-        updated[updated.length - 1] = { ...last, streaming: false };
+        updated[updated.length - 1] = {
+          ...last,
+          streaming: false,
+          sources: sourceNotes.length > 0 ? sourceNotes : undefined,
+        };
         return updated;
       });
     } catch (err) {
@@ -252,6 +273,10 @@ export default function AiSidebar() {
                 >
                   Ask me anything about your notes!
                 </p>
+                <p className="mt-1 text-xs text-pencil/30"
+                >
+                  I can search across your entire knowledge base
+                </p>
               </div>
             )}
             {messages.map((msg) => (
@@ -270,21 +295,36 @@ export default function AiSidebar() {
                     <Bot size={14} strokeWidth={2.5} />
                   )}
                 </div>
-                <div
-                  className={`max-w-[85%] border-2 px-3 py-2 text-sm shadow-sketch-subtle ${
-                    msg.role === "user"
-                      ? "border-pencil bg-pen-blue text-white wobbly-sm"
-                      : "border-pencil bg-white text-pencil wobbly-sm"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap"
+                <div className="flex max-w-[85%] flex-col gap-1">
+                  <div
+                    className={`border-2 px-3 py-2 text-sm shadow-sketch-subtle ${
+                      msg.role === "user"
+                        ? "border-pencil bg-pen-blue text-white wobbly-sm"
+                        : "border-pencil bg-white text-pencil wobbly-sm"
+                    }`}
                   >
-                    {msg.content}
-                    {msg.streaming && (
-                      <span className="ml-1 inline-block h-3 w-3 animate-pulse rounded-full bg-pen-blue"
-                      />
-                    )}
+                    <div className="whitespace-pre-wrap"
+                    >
+                      {msg.content}
+                      {msg.streaming && (
+                        <span className="ml-1 inline-block h-3 w-3 animate-pulse rounded-full bg-pen-blue"
+                        />
+                      )}
+                    </div>
                   </div>
+                  {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
+                    <div className="flex flex-wrap gap-1 px-1">
+                      {msg.sources.map((source) => (
+                        <a
+                          key={source.id}
+                          href={`/note/${source.id}`}
+                          className="inline-flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
+                        >
+                          <span className="truncate max-w-[180px]">{source.title}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

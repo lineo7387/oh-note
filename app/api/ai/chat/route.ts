@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { searchSimilarNotes } from "@/lib/embedding";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -25,9 +26,57 @@ export async function POST(request: Request) {
       );
     }
 
-    const systemPrompt = noteContext
-      ? `You are a helpful AI assistant embedded in a note-taking app. The user is currently working on a note with the following content:\n\n---\n${noteContext}\n---\n\nUse the note content as context when answering. Be concise and helpful.`
-      : "You are a helpful AI assistant embedded in a note-taking app.";
+    // Retrieve relevant notes from knowledge base using the last user message
+    const lastUserMessage = messages
+      .slice()
+      .reverse()
+      .find((m: { role: string }) => m.role === "user");
+
+    let knowledgeBaseContext = "";
+    let sourceNotes: { id: string; title: string }[] = [];
+
+    if (lastUserMessage?.content) {
+      try {
+        const results = await searchSimilarNotes(
+          lastUserMessage.content,
+          session.user.id,
+          3
+        );
+        if (results.length > 0) {
+          sourceNotes = results.map((r) => ({ id: r.noteId, title: r.title }));
+          knowledgeBaseContext =
+            "The following notes from the user's knowledge base may be relevant:\n\n" +
+            results
+              .map(
+                (r, i) =>
+                  `--- Note ${i + 1}: ${r.title} ---\n${r.textSnapshot}`
+              )
+              .join("\n\n");
+        }
+      } catch {
+        // Knowledge base search failure should not block the chat
+      }
+    }
+
+    const parts: string[] = [
+      "You are a helpful AI assistant embedded in a note-taking app.",
+    ];
+
+    if (noteContext) {
+      parts.push(
+        `The user is currently working on a note with the following content:\n\n---\n${noteContext}\n---`
+      );
+    }
+
+    if (knowledgeBaseContext) {
+      parts.push(knowledgeBaseContext);
+    }
+
+    parts.push(
+      "Use the provided context when answering. If the context doesn't contain relevant information, answer based on your general knowledge. Be concise and helpful."
+    );
+
+    const systemPrompt = parts.join("\n\n");
 
     const apiMessages = [
       { role: "system", content: systemPrompt },
@@ -84,6 +133,9 @@ export async function POST(request: Request) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "X-Source-Notes": sourceNotes.length > 0
+          ? encodeURIComponent(JSON.stringify(sourceNotes))
+          : "",
       },
     });
   } catch {

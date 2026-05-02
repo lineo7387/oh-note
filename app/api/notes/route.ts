@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { upsertNoteEmbedding } from "@/lib/embedding";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -79,6 +80,16 @@ export async function POST(request: Request) {
         userId: session.user.id,
         folderId,
       },
+    });
+
+    // Async: generate embedding for the new note (non-blocking)
+    upsertNoteEmbedding(
+      note.id,
+      session.user.id,
+      note.title,
+      note.content
+    ).catch(() => {
+      // Silently ignore embedding failures
     });
 
     return NextResponse.json(note, { status: 201 });
