@@ -20,7 +20,10 @@ export default async function MainLayout({
   }
 
   return (
-    <MobileShell folderTree={<FolderTreeServer userId={session.user.id} />}>
+    <MobileShell
+      folderTree={<FolderTreeServer userId={session.user.id} />}
+      userEmail={session.user.email}
+    >
       {children}
     </MobileShell>
   );

@@ -40,6 +40,7 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
     current: "",
     phase: "idle",
   });
+  const [newFolderName, setNewFolderName] = useState("");
   const singleFileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
@@ -84,9 +85,18 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
     [editor]
   );
 
+  const resolveTargetFolder = useCallback(async (): Promise<string | null> => {
+    if (newFolderName.trim()) {
+      const folder = await createFolder(newFolderName.trim(), folderId);
+      addFolder(folder);
+      return folder.id;
+    }
+    return folderId;
+  }, [newFolderName, folderId, createFolder, addFolder]);
+
   const handleSingleFiles = useCallback(
     async (files: FileList | null) => {
-      if (!files || !folderId) return;
+      if (!files) return;
 
       const mdFiles = Array.from(files).filter((f) =>
         f.name.toLowerCase().endsWith(".md")
@@ -94,6 +104,13 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
       if (mdFiles.length === 0) {
         toastError("No .md files selected");
         return;
+      }
+
+      let targetId = await resolveTargetFolder();
+      if (!targetId) {
+        const folder = await createFolder("Imported", null);
+        addFolder(folder);
+        targetId = folder.id;
       }
 
       abortRef.current = false;
@@ -110,7 +127,7 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
           const markdown = await file.text();
           const processedMarkdown = rewriteImageUrls(markdown);
           const blocks = await parseMarkdown(processedMarkdown);
-          await createNote(title, folderId, blocks);
+          await createNote(title, targetId, blocks);
           setProgress((p) => ({ ...p, done: i + 1 }));
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -125,12 +142,12 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
         success(`Imported ${mdFiles.length} note${mdFiles.length > 1 ? "s" : ""}`);
       }
     },
-    [folderId, toastError, success, parseMarkdown, createNote]
+    [toastError, success, parseMarkdown, createNote, resolveTargetFolder]
   );
 
   const handleFolder = useCallback(
     async (files: FileList | null) => {
-      if (!files || !folderId) return;
+      if (!files) return;
 
       const mdFiles = Array.from(files).filter((f) =>
         f.name.toLowerCase().endsWith(".md")
@@ -139,6 +156,8 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
         toastError("No .md files found in selected folder");
         return;
       }
+
+      const targetId = await resolveTargetFolder();
 
       abortRef.current = false;
       setProgress({ total: mdFiles.length, done: 0, current: "", phase: "running" });
@@ -157,15 +176,13 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
         const file = mdFiles[i];
         const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
         const parts = relativePath.split("/");
-        // Remove the root directory name selected by the user
-        parts.shift();
         const fileName = parts.pop() || file.name;
         const title = fileName.replace(/\.md$/i, "");
 
         setProgress((p) => ({ ...p, current: relativePath }));
 
         try {
-          let currentParentId = folderId;
+          let currentParentId = targetId;
 
           // Create or navigate folder hierarchy
           for (const part of parts) {
@@ -201,7 +218,7 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
         success(`Imported ${mdFiles.length} note${mdFiles.length > 1 ? "s" : ""}`);
       }
     },
-    [folderId, folders, toastError, success, parseMarkdown, createFolder, createNote, addFolder, addNote]
+    [folders, toastError, success, parseMarkdown, createFolder, createNote, addFolder, addNote, resolveTargetFolder]
   );
 
   const handleCancel = () => {
@@ -209,7 +226,7 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
     setProgress((p) => ({ ...p, phase: "idle" }));
   };
 
-  const canImport = !!folderId && progress.phase !== "running";
+  const canImport = progress.phase !== "running";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
@@ -233,15 +250,38 @@ export default function ImportModal({ folderId, onClose }: ImportModalProps) {
 
         {/* Body */}
         <div className="px-4 py-4">
-          {!folderId && (
-            <div className="flex items-center gap-2 rounded border border-dashed border-accent bg-accent/5 px-3 py-2 text-sm text-accent">
-              <AlertCircle size={16} strokeWidth={2} />
-              Please select a folder first
-            </div>
-          )}
-
           {progress.phase === "idle" && (
             <div className="space-y-3">
+              <div className="rounded border border-pencil/10 bg-white px-3 py-2">
+                <div className="mb-1 text-xs text-pencil/50">Target folder</div>
+                <div className="flex items-center gap-1.5 text-sm text-pencil">
+                  {folderId ? (
+                    <>
+                      <FolderUp size={14} strokeWidth={2} className="text-pencil/50" />
+                      <span className="truncate">{folders.find((f) => f.id === folderId)?.name || "Selected folder"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <FolderUp size={14} strokeWidth={2} className="text-pencil/50" />
+                      <span className="text-pencil/60">Root (no parent folder)</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-pencil/50">
+                  Create new subfolder (optional)
+                </label>
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="my-folder"
+                  className="input-sketch w-full border-2 border-pencil bg-white px-3 py-2 text-sm text-pencil placeholder:text-pencil/40 wobbly-sm"
+                />
+              </div>
+
               <p className="text-sm text-pencil/60">
                 Import Markdown files into the currently selected folder.
                 Network images will be proxied automatically.

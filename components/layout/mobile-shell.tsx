@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import NoteList from "@/components/note-list/note-list";
 import AiSidebar from "@/components/ai-sidebar/ai-sidebar";
+import UserBar from "@/components/user-bar";
 import { SkeletonFolder } from "@/components/ui/skeleton";
 
 function FolderTreeFallback() {
@@ -26,9 +27,10 @@ function FolderTreeFallback() {
 interface MobileShellProps {
   folderTree: React.ReactNode;
   children: React.ReactNode;
+  userEmail?: string;
 }
 
-export default function MobileShell({ folderTree, children }: MobileShellProps) {
+export default function MobileShell({ folderTree, children, userEmail }: MobileShellProps) {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
 
@@ -76,6 +78,7 @@ export default function MobileShell({ folderTree, children }: MobileShellProps) 
         <div className="h-[40%] overflow-hidden">
           <NoteList />
         </div>
+        {userEmail && <UserBar email={userEmail} />}
       </aside>
 
       {/* Main content */}
