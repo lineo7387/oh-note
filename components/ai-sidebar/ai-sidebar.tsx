@@ -1,7 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { MessageCircle, X, Send, Bot, User, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  MessageCircle,
+  X,
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Search,
+  BookOpen,
+  Unlink,
+  Check,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { extractTextFromBlocks } from "@/components/editor/editor";
@@ -19,17 +30,35 @@ interface ChatMessage {
   sources?: SourceNote[];
 }
 
+interface ContextNote {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export default function AiSidebar() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [noteContext, setNoteContext] = useState("");
-  const { error: toastError } = useToast();
+
+  // Context: selected notes + auto-follow flag
+  const [contextNotes, setContextNotes] = useState<ContextNote[]>([]);
+  const [autoFollow, setAutoFollow] = useState(true);
+
+  // Note selector
+  const [showSelector, setShowSelector] = useState(false);
+  const [allNotes, setAllNotes] = useState<{ id: string; title: string }[]>([]);
+  const [noteSearch, setNoteSearch] = useState("");
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  const { success: toastSuccess, error: toastError } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pathname = usePathname();
+  const selectorRef = useRef<HTMLDivElement>(null);
 
   // Load open state from localStorage
   useEffect(() => {
@@ -41,32 +70,154 @@ export default function AiSidebar() {
     localStorage.setItem("oh-note-ai-open", String(open));
   }, [open]);
 
-  // Extract note context when on a note page
+  // Fetch note content by ID
+  const fetchNoteContent = useCallback(async (noteId: string) => {
+    try {
+      const res = await fetch(`/api/notes/${noteId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const note = await res.json();
+      const text = extractTextFromBlocks(note.content);
+      const title = note.title || "Untitled";
+      return {
+        id: noteId,
+        title,
+        content: text
+          ? `Title: ${title}\n\n${text}`
+          : `Title: ${title}\n\n(Empty note)`,
+      };
+    } catch (err) {
+      console.error("fetchNoteContent failed:", err);
+      throw err;
+    }
+  }, []);
+
+  // Handle pathname changes: auto-load context when autoFollow is on and no manual selection
   useEffect(() => {
-    async function loadContext() {
+    async function syncContext() {
+      if (!autoFollow) return;
+      // If user has manually pinned notes, don't override
+      if (contextNotes.length > 0 && !autoFollow) return;
+
       const match = pathname.match(/^\/note\/(.+)$/);
       if (!match) {
-        setNoteContext("");
+        if (autoFollow) setContextNotes([]);
         return;
       }
+
       const noteId = match[1];
+      // If already in contextNotes, don't refetch
+      if (contextNotes.some((n) => n.id === noteId)) return;
+
       try {
-        const res = await fetch(`/api/notes/${noteId}`);
-        if (res.ok) {
-          const note = await res.json();
-          const text = extractTextFromBlocks(note.content);
-          const title = note.title || "Untitled";
-          setNoteContext(text ? `Title: ${title}\n\n${text}` : `Title: ${title}\n\n(Empty note)`);
-        } else {
-          toastError("Failed to load note context for AI");
+        const note = await fetchNoteContent(noteId);
+        if (note) {
+          setContextNotes([note]);
         }
       } catch {
-        toastError("Failed to load note context for AI");
-        setNoteContext("");
+        // silently ignore
       }
     }
-    loadContext();
-  }, [pathname]);
+    syncContext();
+  }, [pathname, autoFollow, fetchNoteContent]);
+
+  // Load all notes for selector
+  const loadAllNotes = useCallback(async () => {
+    setLoadingNotes(true);
+    setLoadError("");
+    try {
+      const res = await fetch("/api/notes/all");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const notes = await res.json();
+      if (!Array.isArray(notes)) {
+        throw new Error("Invalid response format");
+      }
+      setAllNotes(notes);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load notes";
+      setLoadError(msg);
+      console.error("loadAllNotes failed:", err);
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, []);
+
+  // Open selector
+  const openSelector = useCallback(() => {
+    setShowSelector(true);
+    setNoteSearch("");
+    setLoadError("");
+    loadAllNotes();
+  }, [loadAllNotes]);
+
+  // Toggle note selection in selector
+  const toggleNoteSelection = useCallback(
+    async (noteId: string, title: string) => {
+      setContextNotes((prev) => {
+        const exists = prev.some((n) => n.id === noteId);
+        if (exists) {
+          return prev.filter((n) => n.id !== noteId);
+        }
+        // Need to fetch content - do it outside setState
+        fetchNoteContent(noteId).then((note) => {
+          if (note) {
+            setContextNotes((current) => {
+              // avoid duplicates
+              if (current.some((n) => n.id === noteId)) return current;
+              return [...current, note];
+            });
+          }
+        });
+        return prev;
+      });
+      setAutoFollow(false);
+    },
+    [fetchNoteContent]
+  );
+
+  // Remove a single context note
+  const removeContextNote = useCallback((noteId: string) => {
+    setContextNotes((prev) => prev.filter((n) => n.id !== noteId));
+  }, []);
+
+  // Clear all context (knowledge-base only mode)
+  const clearAllContext = useCallback(() => {
+    setContextNotes([]);
+    setAutoFollow(false);
+    setShowSelector(false);
+  }, []);
+
+  // Resume following current note
+  const followCurrent = useCallback(() => {
+    setContextNotes([]);
+    setAutoFollow(true);
+    setShowSelector(false);
+  }, []);
+
+  // Close selector
+  const closeSelector = useCallback(() => {
+    setShowSelector(false);
+  }, []);
+
+  // Click outside to close selector
+  useEffect(() => {
+    if (!showSelector) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        selectorRef.current &&
+        !selectorRef.current.contains(e.target as Node)
+      ) {
+        setShowSelector(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSelector]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -80,14 +231,33 @@ export default function AiSidebar() {
     }
   }, [open]);
 
-  // Escape to close
+  // Escape to close sidebar or selector
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && open) setOpen(false);
+      if (e.key === "Escape" && open) {
+        if (showSelector) {
+          setShowSelector(false);
+        } else {
+          setOpen(false);
+        }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  }, [open, showSelector]);
+
+  // Filtered notes for selector
+  const filteredNotes = useMemo(() => {
+    if (!noteSearch.trim()) return allNotes;
+    const q = noteSearch.toLowerCase();
+    return allNotes.filter((n) => n.title.toLowerCase().includes(q));
+  }, [allNotes, noteSearch]);
+
+  // Build noteContext string for API
+  const noteContext = useMemo(() => {
+    if (contextNotes.length === 0) return "";
+    return contextNotes.map((n) => n.content).join("\n\n---\n\n");
+  }, [contextNotes]);
 
   const sendMessage = useCallback(async () => {
     if (!input.trim() || loading) return;
@@ -217,6 +387,12 @@ export default function AiSidebar() {
     }
   };
 
+  // Is a note currently selected in the selector
+  const isNoteSelected = useCallback(
+    (noteId: string) => contextNotes.some((n) => n.id === noteId),
+    [contextNotes]
+  );
+
   return (
     <>
       {/* Floating bubble */}
@@ -254,13 +430,219 @@ export default function AiSidebar() {
             </button>
           </div>
 
-          {/* Context indicator */}
-          {noteContext && (
-            <div className="mx-3 mt-2 border border-dashed border-pencil/20 bg-white/50 px-2 py-1 text-xs text-pencil/50 truncate"
-            >
-              Context: {noteContext.split("\n")[0]?.replace("Title: ", "") || "Current note"}
-            </div>
-          )}
+          {/* Context control bar */}
+          <div className="relative border-b border-dashed border-pencil/20 px-3 py-2"
+          >
+            {contextNotes.length === 0 ? (
+              <div className="flex items-center justify-between gap-2"
+              >
+                <span className="text-xs text-pencil/40"
+                >
+                  {autoFollow
+                    ? "Following current note"
+                    : "No context (knowledge base mode)"}
+                </span>
+                <div className="flex items-center gap-1"
+                >
+                  {!autoFollow && (
+                    <button
+                      onClick={followCurrent}
+                      className="flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
+                    >
+                      <BookOpen size={12} />
+                      Follow
+                    </button>
+                  )}
+                  <button
+                    onClick={openSelector}
+                    className="flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
+                  >
+                    <Search size={12} />
+                    Pick
+                  </button>
+                  {contextNotes.length > 0 && (
+                    <button
+                      onClick={clearAllContext}
+                      className="flex h-5 w-5 items-center justify-center rounded text-pencil/40 hover:text-accent"
+                    >
+                      <X size={12} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5"
+              >
+                <div className="flex flex-wrap gap-1"
+                >
+                  {contextNotes.map((note) => (
+                    <span
+                      key={note.id}
+                      className="inline-flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/70"
+                    >
+                      <BookOpen size={10} className="text-pen-blue" />
+                      <span className="truncate max-w-[140px]"
+                      >{note.title}</span>
+                      <button
+                        onClick={() => removeContextNote(note.id)}
+                        className="ml-0.5 text-pencil/40 hover:text-accent"
+                      >
+                        <X size={10} strokeWidth={2.5} />
+                      </button>
+                    </span>
+                  ))}
+                  {!autoFollow && contextNotes.length > 0 && (
+                    <span className="inline-flex items-center rounded bg-pen-blue/10 px-1.5 py-0.5 text-[10px] text-pen-blue"
+                    >
+                      pinned
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1"
+                >
+                  {!autoFollow && (
+                    <button
+                      onClick={followCurrent}
+                      className="flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
+                    >
+                      <Unlink size={12} />
+                      Follow current
+                    </button>
+                  )}
+                  <button
+                    onClick={openSelector}
+                    className="flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
+                  >
+                    <Search size={12} />
+                    {contextNotes.length > 0 ? "Add more" : "Pick"}
+                  </button>
+                  <button
+                    onClick={clearAllContext}
+                    className="flex h-5 w-5 items-center justify-center rounded text-pencil/40 hover:text-accent"
+                    title="Clear all"
+                  >
+                    <X size={12} strokeWidth={2.5} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Note selector dropdown */}
+            {showSelector && (
+              <div
+                ref={selectorRef}
+                className="absolute left-2 right-2 top-full z-10 mt-1 border-2 border-pencil bg-paper shadow-sketch"
+              >
+                {/* Search */}
+                <div className="border-b border-dashed border-pencil/20 p-2"
+                >
+                  <div className="flex items-center gap-1.5 border-2 border-pencil bg-white px-2 py-1"
+                  >
+                    <Search size={12} className="text-pencil/40" />
+                    <input
+                      type="text"
+                      value={noteSearch}
+                      onChange={(e) => setNoteSearch(e.target.value)}
+                      placeholder="Search notes..."
+                      className="flex-1 bg-transparent text-xs text-pencil outline-none placeholder:text-pencil/30"
+                      autoFocus
+                    />
+                    {noteSearch && (
+                      <button
+                        onClick={() => setNoteSearch("")}
+                        className="text-pencil/40 hover:text-accent"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Note list */}
+                <div className="max-h-[220px] overflow-y-auto"
+                >
+                  {loadingNotes ? (
+                    <div className="flex items-center justify-center gap-2 py-4 text-xs text-pencil/40"
+                    >
+                      <Loader2 size={14} className="animate-spin" />
+                      Loading notes...
+                    </div>
+                  ) : loadError ? (
+                    <div className="px-3 py-3 text-center"
+                    >
+                      <p className="text-xs text-accent"
+                      >{loadError}</p>
+                      <button
+                        onClick={loadAllNotes}
+                        className="mt-1 text-xs text-pen-blue hover:underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : filteredNotes.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-pencil/40"
+                    >
+                      {noteSearch ? "No notes found" : "No notes"}
+                    </div>
+                  ) : (
+                    filteredNotes.map((note) => {
+                      const selected = isNoteSelected(note.id);
+                      return (
+                        <button
+                          key={note.id}
+                          onClick={() => toggleNoteSelection(note.id, note.title)}
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-pencil/5 ${
+                            selected
+                              ? "bg-pen-blue/5 text-pen-blue"
+                              : "text-pencil/70"
+                          }`}
+                        >
+                          <div
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center border-2 ${
+                              selected
+                                ? "border-pen-blue bg-pen-blue text-white"
+                                : "border-pencil/30"
+                            }`}
+                          >
+                            {selected && <Check size={10} strokeWidth={3} />}
+                          </div>
+                          <BookOpen size={12} className="shrink-0" />
+                          <span className="truncate"
+                          >{note.title || "Untitled"}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between border-t border-dashed border-pencil/20 px-3 py-1.5"
+                >
+                  <span className="text-[10px] text-pencil/40"
+                  >
+                    {contextNotes.length > 0
+                      ? `${contextNotes.length} selected`
+                      : "Click to select"}
+                  </span>
+                  <div className="flex items-center gap-1"
+                  >
+                    <button
+                      onClick={clearAllContext}
+                      className="px-2 py-0.5 text-xs text-pencil/50 hover:text-accent"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={closeSelector}
+                      className="rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil hover:border-pen-blue hover:text-pen-blue"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3"
@@ -286,7 +668,9 @@ export default function AiSidebar() {
               >
                 <div
                   className={`flex h-7 w-7 shrink-0 items-center justify-center border-2 border-pencil ${
-                    msg.role === "user" ? "bg-pen-blue text-white" : "bg-white text-pencil"
+                    msg.role === "user"
+                      ? "bg-pen-blue text-white"
+                      : "bg-white text-pencil"
                   } wobbly-sm`}
                 >
                   {msg.role === "user" ? (
@@ -295,7 +679,8 @@ export default function AiSidebar() {
                     <Bot size={14} strokeWidth={2.5} />
                   )}
                 </div>
-                <div className="flex max-w-[85%] flex-col gap-1">
+                <div className="flex max-w-[85%] flex-col gap-1"
+                >
                   <div
                     className={`border-2 px-3 py-2 text-sm shadow-sketch-subtle ${
                       msg.role === "user"
@@ -312,19 +697,23 @@ export default function AiSidebar() {
                       )}
                     </div>
                   </div>
-                  {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
-                    <div className="flex flex-wrap gap-1 px-1">
-                      {msg.sources.map((source) => (
-                        <a
-                          key={source.id}
-                          href={`/note/${source.id}`}
-                          className="inline-flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
-                        >
-                          <span className="truncate max-w-[180px]">{source.title}</span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  {msg.role === "assistant" &&
+                    msg.sources &&
+                    msg.sources.length > 0 && (
+                      <div className="flex flex-wrap gap-1 px-1"
+                      >
+                        {msg.sources.map((source) => (
+                          <a
+                            key={source.id}
+                            href={`/note/${source.id}`}
+                            className="inline-flex items-center gap-1 rounded border border-pencil/20 bg-white px-2 py-0.5 text-xs text-pencil/60 hover:border-pen-blue hover:text-pen-blue"
+                          >
+                            <span className="truncate max-w-[180px]"
+                            >{source.title}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
                 </div>
               </div>
             ))}
