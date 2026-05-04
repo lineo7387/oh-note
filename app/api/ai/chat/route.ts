@@ -104,7 +104,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         const reader = apiResponse.body?.getReader();

@@ -1,5 +1,3 @@
-import { SkeletonLine } from "@/components/ui/skeleton";
-
 export default function Loading() {
   return (
     <div className="flex h-full w-full flex-col bg-paper">

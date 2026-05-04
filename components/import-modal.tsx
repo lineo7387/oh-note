@@ -24,7 +24,7 @@ interface ImportProgress {
 const IMAGE_REGEX = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
 
 function rewriteImageUrls(markdown: string): string {
-  return markdown.replace(IMAGE_REGEX, (match, alt, url) => {
+  return markdown.replace(IMAGE_REGEX, (_match, alt, url) => {
     const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
     return `![${alt}](${proxyUrl})`;
   });

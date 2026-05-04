@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
-import { User, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 interface UserBarProps {
   email: string;

@@ -14,7 +14,6 @@ import {
   Check,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useToast } from "@/components/ui/toast";
 import { extractTextFromBlocks } from "@/components/editor/editor";
 
 interface SourceNote {
@@ -53,7 +52,6 @@ export default function AiSidebar() {
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  const { success: toastSuccess, error: toastError } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -98,8 +96,6 @@ export default function AiSidebar() {
   useEffect(() => {
     async function syncContext() {
       if (!autoFollow) return;
-      // If user has manually pinned notes, don't override
-      if (contextNotes.length > 0 && !autoFollow) return;
 
       const match = pathname.match(/^\/note\/(.+)$/);
       if (!match) {
@@ -157,7 +153,7 @@ export default function AiSidebar() {
 
   // Toggle note selection in selector
   const toggleNoteSelection = useCallback(
-    async (noteId: string, title: string) => {
+    async (noteId: string) => {
       setContextNotes((prev) => {
         const exists = prev.some((n) => n.id === noteId);
         if (exists) {
@@ -460,14 +456,6 @@ export default function AiSidebar() {
                     <Search size={12} />
                     Pick
                   </button>
-                  {contextNotes.length > 0 && (
-                    <button
-                      onClick={clearAllContext}
-                      className="flex h-5 w-5 items-center justify-center rounded text-pencil/40 hover:text-accent"
-                    >
-                      <X size={12} strokeWidth={2.5} />
-                    </button>
-                  )}
                 </div>
               </div>
             ) : (
@@ -590,7 +578,7 @@ export default function AiSidebar() {
                       return (
                         <button
                           key={note.id}
-                          onClick={() => toggleNoteSelection(note.id, note.title)}
+                          onClick={() => toggleNoteSelection(note.id)}
                           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-pencil/5 ${
                             selected
                               ? "bg-pen-blue/5 text-pen-blue"

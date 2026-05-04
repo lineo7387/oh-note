@@ -4,7 +4,6 @@ const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY;
 const EMBEDDING_API_BASE =
   process.env.SILICONFLOW_API_BASE || "https://api.siliconflow.cn/v1";
 const EMBEDDING_MODEL = "BAAI/bge-m3";
-const EMBEDDING_DIMENSION = 1024;
 
 export interface SearchResult {
   noteId: string;
