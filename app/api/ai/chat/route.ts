@@ -1,6 +1,25 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { searchSimilarNotes } from "@/lib/embedding";
+import { toolSchemas, executeTool, SourceNote } from "@/lib/ai-tools";
+
+interface ChatMessage {
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  tool_call_id?: string;
+  tool_calls?: ToolCall[];
+  name?: string;
+}
+
+interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+const MAX_TOOL_ROUNDS = 4;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -9,7 +28,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { messages, noteContext } = await request.json();
+    const { messages, noteContext } = (await request.json()) as {
+      messages: ChatMessage[];
+      noteContext?: string;
+    };
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -26,40 +48,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Retrieve relevant notes from knowledge base using the last user message
-    const lastUserMessage = messages
-      .slice()
-      .reverse()
-      .find((m: { role: string }) => m.role === "user");
-
-    let knowledgeBaseContext = "";
-    let sourceNotes: { id: string; title: string }[] = [];
-
-    if (lastUserMessage?.content) {
-      try {
-        const results = await searchSimilarNotes(
-          lastUserMessage.content,
-          session.user.id,
-          3
-        );
-        if (results.length > 0) {
-          sourceNotes = results.map((r) => ({ id: r.noteId, title: r.title }));
-          knowledgeBaseContext =
-            "The following notes from the user's knowledge base may be relevant:\n\n" +
-            results
-              .map(
-                (r, i) =>
-                  `--- Note ${i + 1}: ${r.title} ---\n${r.textSnapshot}`
-              )
-              .join("\n\n");
-        }
-      } catch {
-        // Knowledge base search failure should not block the chat
-      }
-    }
-
+    // Build system prompt
     const parts: string[] = [
       "You are a helpful AI assistant embedded in a note-taking app.",
+      "You have access to tools that let you query the user's notes.",
+      "Use the tools based on what the user is asking:",
+      '- search_notes_semantic: use for questions about content, concepts, topics, or ideas within notes ("what does X say?", "how does Y work?")',
+      '- get_folder_tree: use when the user mentions a folder name and you need to resolve it, or when asking about structure',
+      '- list_notes_in_folder: use when the user asks to list or enumerate notes in a folder',
+      '- count_notes: use when the user asks "how many notes", counts, or totals',
+      "Be concise and helpful. Use the folderPath field in results to provide context about where notes are located.",
     ];
 
     if (noteContext) {
@@ -68,33 +66,173 @@ export async function POST(request: Request) {
       );
     }
 
-    if (knowledgeBaseContext) {
-      parts.push(knowledgeBaseContext);
-    }
-
-    parts.push(
-      "Use the provided context when answering. If the context doesn't contain relevant information, answer based on your general knowledge. Be concise and helpful."
-    );
-
     const systemPrompt = parts.join("\n\n");
 
-    const apiMessages = [
+    const apiMessages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
       ...messages,
     ];
 
-    const apiResponse = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-v4-pro",
-        messages: apiMessages,
-        stream: true,
-      }),
-    });
+    // Tool-calling loop
+    const allSources: SourceNote[] = [];
+    let round = 0;
+
+    while (round < MAX_TOOL_ROUNDS) {
+      round++;
+
+      const res = await fetch(
+        "https://api.deepseek.com/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek-v4-pro",
+            messages: apiMessages,
+            tools: toolSchemas,
+            stream: false,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        return NextResponse.json(
+          { error: `DeepSeek API error: ${errorText}` },
+          { status: res.status }
+        );
+      }
+
+      const data = (await res.json()) as {
+        choices: { message: ChatMessage }[];
+      };
+
+      const message = data.choices[0]?.message;
+      if (!message) {
+        return NextResponse.json(
+          { error: "Empty response from DeepSeek" },
+          { status: 500 }
+        );
+
+      }
+
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        // Execute tools
+        apiMessages.push(message);
+
+        for (const call of message.tool_calls) {
+          let args: Record<string, unknown> = {};
+          try {
+            args = JSON.parse(call.function.arguments);
+          } catch {
+            // malformed args
+          }
+
+          const { result, sources } = await executeTool(
+            call.function.name,
+            args,
+            session.user.id
+          );
+
+          for (const s of sources) {
+            if (!allSources.some((x) => x.id === s.id)) {
+              allSources.push(s);
+            }
+          }
+
+          apiMessages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: result,
+          });
+        }
+
+        continue;
+      }
+
+      // No tool calls — stream the final response
+      break;
+    }
+
+    // If we hit max rounds, force a final call without tools
+    if (round >= MAX_TOOL_ROUNDS) {
+      const res = await fetch(
+        "https://api.deepseek.com/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek-v4-pro",
+            messages: apiMessages,
+            stream: false,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        return NextResponse.json(
+          { error: `DeepSeek API error: ${errorText}` },
+          { status: res.status }
+        );
+      }
+
+      const data = (await res.json()) as {
+        choices: { message: ChatMessage }[];
+      };
+      const content = data.choices[0]?.message?.content || "";
+
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          const lines = content.split("");
+          for (const char of lines) {
+            const payload = JSON.stringify({
+              choices: [{ delta: { content: char } }],
+            });
+            controller.enqueue(
+              encoder.encode(`data: ${payload}\n\n`)
+            );
+          }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          "X-Source-Notes":
+            allSources.length > 0
+              ? encodeURIComponent(JSON.stringify(allSources))
+              : "",
+        },
+      });
+    }
+
+    // Stream final response
+    const apiResponse = await fetch(
+      "https://api.deepseek.com/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-v4-pro",
+          messages: apiMessages,
+          stream: true,
+        }),
+      }
+    );
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
@@ -132,9 +270,10 @@ export async function POST(request: Request) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
-        "X-Source-Notes": sourceNotes.length > 0
-          ? encodeURIComponent(JSON.stringify(sourceNotes))
-          : "",
+        "X-Source-Notes":
+          allSources.length > 0
+            ? encodeURIComponent(JSON.stringify(allSources))
+            : "",
       },
     });
   } catch {
