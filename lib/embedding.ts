@@ -10,6 +10,7 @@ export interface SearchResult {
   title: string;
   textSnapshot: string;
   similarity: number;
+  folderPath: string;
 }
 
 /**
@@ -84,7 +85,8 @@ export async function upsertNoteEmbedding(
 export async function searchSimilarNotes(
   queryText: string,
   userId: string,
-  topK: number = 3
+  topK: number = 8,
+  threshold: number = 0.3
 ): Promise<SearchResult[]> {
   const embedding = await generateEmbedding(queryText);
   const vectorLiteral = `[${embedding.join(",")}]`;
@@ -95,21 +97,36 @@ export async function searchSimilarNotes(
       title: string;
       textSnapshot: string;
       similarity: number;
+      folderPath: string;
     }[]
   >(
-    `SELECT
+    `WITH RECURSIVE folder_path AS (
+      SELECT "id", "name", "parentId", "name"::text AS path
+      FROM "Folder"
+      WHERE "userId" = $2 AND "parentId" IS NULL
+      UNION ALL
+      SELECT f."id", f."name", f."parentId", fp.path || ' / ' || f."name"
+      FROM "Folder" f
+      JOIN folder_path fp ON f."parentId" = fp."id"
+      WHERE f."userId" = $2
+    )
+    SELECT
       n."id" as "noteId",
       n."title",
       ne."textSnapshot",
-      1 - (ne."embedding" <=> $1::vector) as "similarity"
-     FROM "NoteEmbedding" ne
-     JOIN "Note" n ON n."id" = ne."noteId"
-     WHERE ne."userId" = $2
-     ORDER BY ne."embedding" <=> $1::vector
-     LIMIT $3`,
+      1 - (ne."embedding" <=> $1::vector) as "similarity",
+      COALESCE(fp.path, '') as "folderPath"
+    FROM "NoteEmbedding" ne
+    JOIN "Note" n ON n."id" = ne."noteId"
+    LEFT JOIN folder_path fp ON fp."id" = n."folderId"
+    WHERE ne."userId" = $2
+      AND 1 - (ne."embedding" <=> $1::vector) >= $4
+    ORDER BY ne."embedding" <=> $1::vector
+    LIMIT $3`,
     vectorLiteral,
     userId,
-    topK
+    topK,
+    threshold
   );
 
   return results.map((r) => ({
@@ -117,6 +134,7 @@ export async function searchSimilarNotes(
     title: r.title,
     textSnapshot: r.textSnapshot,
     similarity: Number(r.similarity),
+    folderPath: r.folderPath,
   }));
 }
 
