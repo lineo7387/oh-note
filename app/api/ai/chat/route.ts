@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     // Build system prompt
     const parts: string[] = [
-      "You are a helpful AI assistant embedded in a note-taking app.",
+      "You are a helpful AI assistant embedded in a note-taking app. You are powered by DeepSeek (deepseek-v4-pro).",
       "You have access to tools that let you query the user's notes.",
       "Use the tools based on what the user is asking:",
       '- search_notes_semantic: use for questions about content, concepts, topics, or ideas within notes ("what does X say?", "how does Y work?")',
