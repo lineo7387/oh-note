@@ -600,7 +600,7 @@ export default function AiSidebar() {
 
   return (
     <div
-      className="fixed right-0 top-0 z-50 flex h-full flex-col border-l-2 border-pencil bg-paper shadow-[-8px_0_24px_0_rgba(0,0,0,0.12)] lg:static lg:z-auto lg:shadow-[-4px_0_0_0_#2d2d2d]"
+      className="fixed right-0 top-0 z-50 flex h-full flex-col border-l-2 border-pencil bg-paper shadow-[-8px_0_24px_0_rgba(0,0,0,0.12)] lg:relative lg:z-auto lg:shadow-[-4px_0_0_0_#2d2d2d]"
       style={{ width: sidebarWidth }}
     >
       <ResizeHandle

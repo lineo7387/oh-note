@@ -47,12 +47,15 @@ export default function ResizeHandle({ onResize }: ResizeHandleProps) {
   return (
     <div
       onMouseDown={handleMouseDown}
-      className="absolute left-0 top-0 z-10 h-full w-[8px] -translate-x-1/2 cursor-ew-resize"
+      className="absolute left-0 top-0 z-20 h-full w-[12px] -translate-x-1/2 cursor-ew-resize"
       style={{ touchAction: "none" }}
+      title="Drag to resize"
     >
       <div
         className={`mx-auto h-full w-[4px] transition-colors ${
-          dragging ? "bg-pen-blue" : "bg-transparent hover:bg-pencil/20"
+          dragging
+            ? "bg-pen-blue"
+            : "bg-pencil/15 hover:bg-pencil/40"
         }`}
       />
     </div>
