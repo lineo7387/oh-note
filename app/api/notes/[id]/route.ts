@@ -17,6 +17,15 @@ export async function GET(
 
     const note = await prisma.note.findFirst({
       where: { id, userId: session.user.id },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        createdAt: true,
+        updatedAt: true,
+        folderId: true,
+        userId: true,
+      },
     });
 
     if (!note) {
@@ -27,7 +36,8 @@ export async function GET(
     }
 
     return NextResponse.json(note);
-  } catch {
+  } catch (err) {
+    console.error("[API /notes/:id GET] error:", err);
     return NextResponse.json(
       { error: "Failed to fetch note" },
       { status: 500 }
@@ -79,7 +89,8 @@ export async function PATCH(
     });
 
     return NextResponse.json(updated);
-  } catch {
+  } catch (err) {
+    console.error("[API /notes/:id PATCH] error:", err);
     return NextResponse.json(
       { error: "Failed to update note" },
       { status: 500 }
@@ -112,7 +123,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("[API /notes/:id DELETE] error:", err);
     return NextResponse.json(
       { error: "Failed to delete note" },
       { status: 500 }

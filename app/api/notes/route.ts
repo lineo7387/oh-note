@@ -19,17 +19,6 @@ export async function GET(request: Request) {
     );
   }
 
-  const folder = await prisma.folder.findFirst({
-    where: { id: folderId, userId: session.user.id },
-  });
-
-  if (!folder) {
-    return NextResponse.json(
-      { error: "Folder not found" },
-      { status: 404 }
-    );
-  }
-
   const notes = await prisma.note.findMany({
     where: { folderId, userId: session.user.id },
     orderBy: { updatedAt: "desc" },

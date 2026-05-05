@@ -20,6 +20,7 @@ import {
   Check,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useAppStore } from "@/lib/store";
 import { extractTextFromBlocks } from "@/components/editor/editor";
 import {
   type ChatMessage,
@@ -79,6 +80,7 @@ export default function AiSidebar() {
   const pathname = usePathname();
   const selectorRef = useRef<HTMLDivElement>(null);
   const latestMessagesRef = useRef<ChatMessage[]>([]);
+  const currentNote = useAppStore((s) => s.currentNote);
 
   // Keep latestMessagesRef in sync
   useEffect(() => {
@@ -152,7 +154,7 @@ export default function AiSidebar() {
     }
   }, []);
 
-  // Handle pathname changes
+  // Handle pathname / currentNote changes for auto-follow
   useEffect(() => {
     async function syncContext() {
       if (!autoFollow || !activeConversationId) return;
@@ -166,13 +168,25 @@ export default function AiSidebar() {
       const noteId = match[1];
       if (contextNotes.some((n) => n.id === noteId)) return;
 
-      const note = await fetchNoteContent(noteId);
-      if (note) {
-        setContextNotes([note]);
-      }
+      // If currentNote is null, NotePage is loading or unmounted — wait.
+      // If currentNote exists but doesn't match pathname, we're switching
+      // notes and NotePage hasn't finished loading yet — also wait.
+      if (!currentNote || currentNote.id !== noteId) return;
+
+      const text = extractTextFromBlocks(currentNote.content);
+      const title = currentNote.title || "Untitled";
+      setContextNotes([
+        {
+          id: noteId,
+          title,
+          content: text
+            ? `Title: ${title}\n\n${text}`
+            : `Title: ${title}\n\n(Empty note)`,
+        },
+      ]);
     }
     syncContext();
-  }, [pathname, autoFollow, activeConversationId, fetchNoteContent]);
+  }, [pathname, autoFollow, activeConversationId, currentNote]);
 
   // Persist context-note IDs when they change
   useEffect(() => {

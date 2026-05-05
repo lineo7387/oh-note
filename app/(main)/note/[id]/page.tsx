@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { FileText, Save } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useToast } from "@/components/ui/toast";
+import { useAppStore } from "@/lib/store";
 import type { BlockNoteDocument } from "@/lib/blocknote-types";
 
 const Editor = dynamic(() => import("@/components/editor/editor"), {
@@ -30,6 +31,7 @@ export default function NotePage() {
   const params = useParams();
   const noteId = params.id as string;
   const { error: toastError } = useToast();
+  const setCurrentNote = useAppStore((s) => s.setCurrentNote);
   const [note, setNote] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,26 +43,41 @@ export default function NotePage() {
   const contentRef = useRef<BlockNoteDocument>([]);
 
   useEffect(() => {
+    const ctrl = new AbortController();
     async function load() {
       setLoading(true);
+      setCurrentNote(null);
       try {
-        const res = await fetch(`/api/notes/${noteId}`);
+        const res = await fetch(`/api/notes/${noteId}`, {
+          signal: ctrl.signal,
+        });
         if (res.ok) {
           const data = await res.json();
           setNote(data);
           setTitle(data.title);
           contentRef.current = data.content;
+          setCurrentNote({
+            id: data.id,
+            title: data.title,
+            content: data.content,
+          });
         } else {
           toastError("Failed to load note");
         }
-      } catch {
-        toastError("Failed to load note");
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          toastError("Failed to load note");
+        }
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [noteId, toastError]);
+    return () => {
+      ctrl.abort();
+      setCurrentNote(null);
+    };
+  }, [noteId, toastError, setCurrentNote]);
 
   const saveNote = useCallback(
     async (updates: { title?: string; content?: BlockNoteDocument }) => {
